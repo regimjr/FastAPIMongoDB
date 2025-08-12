@@ -43,3 +43,53 @@ async def buscar_empresas(termo: str):
         resultado["_id"] = str(resultado["_id"])
 
     return {"resultados": resultados}
+
+# Operação 1: Contagem de empresas por segmento
+@app.get("/estatisticas/segmentos")
+async def get_segmentos_stats():
+    try:
+        pipeline = [
+            # Stage 1: Desagrupa o array 'segmentos' para tratar cada segmento individualmente
+            {"$unwind": "$segmentos"},
+            # Stage 2: Agrupa por nome do segmento e conta os documentos
+            {
+                "$group": {
+                    "_id": "$segmentos.nome_segmento",
+                    "total_empresas": {"$count": {}}
+                }
+            },
+            # Stage 3: Ordena os resultados do maior para o menor
+            {"$sort": {"total_empresas": -1}}
+        ]
+
+        resultados = list(collection.aggregate(pipeline))
+        
+        return resultados
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# Operação 2: Média de tempo de atuação por segmento
+@app.get("/estatisticas/tempo_atuacao")
+async def get_tempo_atuacao_stats():
+    try:
+        pipeline = [
+            # Stage 1: Desagrupa o array 'segmentos'
+            {"$unwind": "$segmentos"},
+            # Stage 2: Filtra documentos que têm o campo tempo_atuacao_anos
+            {"$match": {"tempo_atuacao_anos": {"$exists": True, "$ne": None}}},
+            # Stage 3: Agrupa por nome do segmento e calcula a média
+            {
+                "$group": {
+                    "_id": "$segmentos.nome_segmento",
+                    "media_tempo_atuacao": {"$avg": "$tempo_atuacao_anos"}
+                }
+            },
+            # Stage 4: Ordena os resultados pela média
+            {"$sort": {"media_tempo_atuacao": -1}}
+        ]
+
+        resultados = list(collection.aggregate(pipeline))
+
+        return resultados
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
